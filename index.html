@@ -389,6 +389,17 @@
 </div>
 
 <div class="main" id="main">
+  <!-- Notification-Permission-Banner -->
+  <div id="notifBanner" style="display:none;background:linear-gradient(135deg,rgba(168,85,247,0.18),rgba(124,58,237,0.10));border:1px solid rgba(168,85,247,0.35);border-radius:14px;padding:14px 16px;margin:8px 0 14px;display:none;align-items:center;gap:12px">
+    <div style="font-size:22px">🔔</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13.5px;font-weight:700;color:#fafafa;margin-bottom:2px">Notifications aktivieren</div>
+      <div style="font-size:11.5px;color:#a1a1aa;line-height:1.4">Bekomme einen Hinweis, sobald ein neuer Journal-Eintrag eintrifft.</div>
+    </div>
+    <button onclick="enableNotifs()" style="flex-shrink:0;background:linear-gradient(135deg,#a855f7,#7c3aed);border:0;color:#fff;font-size:11px;font-weight:700;padding:8px 14px;border-radius:999px;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;box-shadow:0 2px 8px rgba(168,85,247,0.4)">Aktivieren</button>
+    <button onclick="dismissNotifBanner()" style="flex-shrink:0;background:none;border:0;color:#52525b;font-size:18px;cursor:pointer;padding:0 4px;line-height:1" title="Ausblenden">×</button>
+  </div>
+  
   <div class="pull-hint" id="pullHint">↓ Release to sync</div>
   <div id="content"></div>
 </div>
@@ -802,14 +813,73 @@ window.setReaderSize = function(size) {
 // ════════════════════════════════════════════════════════════
 // NOTIFICATIONS
 // ════════════════════════════════════════════════════════════
+const NOTIF_BANNER_DISMISSED_KEY = 'journal-mobile-notif-banner-dismissed';
+
+function updateNotifBanner() {
+  const banner = document.getElementById('notifBanner');
+  if (!banner) return;
+  
+  // Wenn API nicht verfügbar (z.B. iOS Safari ohne PWA) → ausblenden
+  if (!('Notification' in window)) {
+    banner.style.display = 'none';
+    return;
+  }
+  
+  // Wenn schon erlaubt oder verweigert → Banner aus
+  if (Notification.permission === 'granted' || Notification.permission === 'denied') {
+    banner.style.display = 'none';
+    return;
+  }
+  
+  // Wenn User Banner manuell geschlossen hat → aus
+  if (localStorage.getItem(NOTIF_BANNER_DISMISSED_KEY)) {
+    banner.style.display = 'none';
+    return;
+  }
+  
+  // Default: Banner zeigen
+  banner.style.display = 'flex';
+}
+
+window.enableNotifs = async function() {
+  if (!('Notification' in window)) {
+    toast('Notifications nicht verfügbar in diesem Browser', 'err');
+    document.getElementById('notifBanner').style.display = 'none';
+    return;
+  }
+  if (navigator.vibrate) navigator.vibrate(10);
+  
+  try {
+    const result = await Notification.requestPermission();
+    if (result === 'granted') {
+      toast('🔔 Notifications aktiviert', 'ok');
+      // Test-Notification gleich rausschicken damit User sieht dass es klappt
+      try {
+        new Notification('🔔 Notifications aktiv', {
+          body: 'Du wirst benachrichtigt, sobald ein neuer Journal-Eintrag eintrifft.',
+          tag: 'journal-notif-enabled',
+        });
+      } catch(e) {}
+    } else if (result === 'denied') {
+      toast('Notifications abgelehnt — Aktivierung über Browser-Einstellungen möglich', 'warn');
+    }
+  } catch(e) {
+    console.warn('requestPermission error:', e);
+    toast('Fehler beim Aktivieren', 'err');
+  }
+  
+  updateNotifBanner();
+};
+
+window.dismissNotifBanner = function() {
+  try { localStorage.setItem(NOTIF_BANNER_DISMISSED_KEY, '1'); } catch(e) {}
+  document.getElementById('notifBanner').style.display = 'none';
+};
+
 async function ensureNotificationPermission() {
   if (!('Notification' in window)) return false;
   if (Notification.permission === 'granted') return true;
-  if (Notification.permission === 'denied') return false;
-  try {
-    const r = await Notification.requestPermission();
-    return r === 'granted';
-  } catch { return false; }
+  return false; // Auto-request entfernt — User muss aktiv klicken
 }
 
 function checkForNewEntries() {
@@ -887,8 +957,8 @@ window.addEventListener('load', async () => {
   // Initial sync
   await syncFromServer(true);
   
-  // Ask for notification permission after first interaction
-  setTimeout(() => ensureNotificationPermission(), 2000);
+  // Permission-Banner aktualisieren
+  updateNotifBanner();
   
   // Auto-sync every 60s
   _syncTimer = setInterval(() => syncFromServer(true), 60000);
