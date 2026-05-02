@@ -445,29 +445,31 @@ async function syncFromServer(silent) {
   try {
     const url = HARDCODED_BASE_URL + '/.netlify/functions/blob-get?key=' 
       + encodeURIComponent(BLOB_KEY) + '&_ts=' + Date.now();
-    const headers = {};
-    if (_etag) headers['If-None-Match'] = _etag;
-    const r = await fetch(url, { headers, cache: 'no-store' });
+    // Kein If-None-Match Header — Backend muss diesen erst in CORS erlauben.
+    // Stattdessen: ETag-Check clientseitig nach dem Fetch (wir schauen ob ETag identisch zum letzten ist).
+    const r = await fetch(url, { cache: 'no-store' });
     
-    if (r.status === 304) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    
+    const newEtag = r.headers.get('ETag') || '';
+    if (newEtag && newEtag === _etag) {
+      // Server-State unverändert → kein Re-Render nötig (spart CPU)
       _lastSyncOk = true;
       setSyncStatus('ok', formatTime(new Date()));
       checkForNewEntries();
       return;
     }
-    if (!r.ok) throw new Error('HTTP ' + r.status);
     
     const text = await r.text();
     if (text) {
       try { _data = JSON.parse(text); } catch(e) { 
-        // Falls Backend ETag-Wrap macht
         try {
           const wrapped = JSON.parse(text);
           if (wrapped && wrapped.data) _data = typeof wrapped.data === 'string' ? JSON.parse(wrapped.data) : wrapped.data;
         } catch {}
       }
     }
-    _etag = r.headers.get('ETag') || _etag;
+    _etag = newEtag;
     _lastSyncOk = true;
     setSyncStatus('ok', formatTime(new Date()));
     
