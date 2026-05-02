@@ -1,0 +1,29 @@
+[build]
+  publish = "."
+  
+[build.environment]
+  SECRETS_SCAN_ENABLED = "false"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Cache HTML kurz (für schnelle Updates), Assets lang
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Default redirect to journal app
+[[redirects]]
+  from = "/"
+  to = "/journal-mobile.html"
+  status = 200
+
+[[redirects]]
+  from = "/journal"
+  to = "/journal-mobile.html"
+  status = 200
