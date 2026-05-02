@@ -562,11 +562,24 @@ function render() {
   const lastSeen = getLastSeen();
   
   if (all.length === 0) {
+    // Diagnose-Anzeige damit wir sehen was los ist
+    const dataKeys = _data ? Object.keys(_data).slice(0, 12).join(', ') : '(kein _data)';
+    const hasMobilePushes = _data && 'mobilePushes' in _data;
+    const mobilePushesType = hasMobilePushes ? (Array.isArray(_data.mobilePushes) ? `Array[${_data.mobilePushes.length}]` : typeof _data.mobilePushes) : '(nicht im State)';
+    const updatedAt = _data?.meta?.updatedAt || '(unbekannt)';
+    
     c.innerHTML = `
       <div class="empty">
         <div class="empty-icon">📖</div>
         <div class="empty-title">No entries yet</div>
         <div class="empty-sub">Send entries from your Journal Booklet on Quantus.<br>Pull down to refresh.</div>
+        <div style="margin-top:32px;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;font-family:monospace;font-size:11px;color:#71717a;text-align:left;line-height:1.6">
+          <div style="font-weight:700;color:#a1a1aa;margin-bottom:6px;font-family:inherit">DEBUG</div>
+          <div>State loaded: ${_data ? 'yes' : 'no'}</div>
+          <div>State.meta.updatedAt: ${escHTML(updatedAt)}</div>
+          <div>mobilePushes: ${escHTML(mobilePushesType)}</div>
+          <div style="margin-top:8px;color:#52525b">Top-level keys: ${escHTML(dataKeys)}</div>
+        </div>
       </div>
     `;
     return;
